@@ -1,8 +1,16 @@
 from flask import Flask, render_template, request, jsonify, session, Response
-import json, os, requests, uuid, re
+import json, os, uuid, re, requests
 from dotenv import load_dotenv
 
-# --- System prompt for chatbot ---
+# --- Load environment variables ---
+load_dotenv()
+PERPLEXITY_KEY = os.getenv("PERPLEXITY_API_KEY")
+
+# --- Flask app setup ---
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'dilse-secret-key')
+
+# --- Chatbot system prompt ---
 system_prompt = """
 You are Dilse, a friendly, caring, and empathetic mental health chatbot for students.
 Always respond in a supportive, concise, and non-judgmental way. Keep language simple and student-focused.
@@ -10,15 +18,7 @@ Do NOT address the user by their name except once when you first meet them (use 
 Always end with a short follow-up question to keep the conversation going.
 """
 
-# --- Flask app setup ---
-app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY', 'dilse-secret-key')
-
-# --- Load environment variables ---
-load_dotenv()
-PERPLEXITY_KEY = os.getenv("PERPLEXITY_API_KEY")
-
-# --- Chat history ---
+# --- Chat history file ---
 HISTORY_FILE = "chat_history.json"
 if os.path.exists(HISTORY_FILE):
     with open(HISTORY_FILE, "r", encoding="utf-8") as f:
@@ -26,21 +26,17 @@ if os.path.exists(HISTORY_FILE):
 else:
     chat_history = []
 
-# --- User data ---
+# --- User data file ---
 USER_FILE = "user.json"
-INVALID_NAMES = {
-    "no","yes","ok","okay","maybe","nah","nope","i","me","my","mine","student","everyone","none",
-    "happy","sad","angry","anxious","excited","stressed","calm","lonely","relaxed","tired","bored","scared","afraid","depressed","upset",
-    "yeah","yep","yup","sure","right","okey","okeydokey","kk","k","thanks","thankyou","thank","cool","nice"
-}
+INVALID_NAMES = {"no","yes","ok","okay","maybe","nah","nope","i","me","my","mine","student","everyone",
+                 "none","happy","sad","angry","anxious","excited","stressed","calm","lonely","relaxed",
+                 "tired","bored","scared","afraid","depressed","upset","yeah","yep","yup","sure","right",
+                 "okey","okeydokey","kk","k","thanks","thankyou","thank","cool","nice"}
 user_data = {}
 if os.path.exists(USER_FILE):
     try:
         with open(USER_FILE, "r", encoding="utf-8") as f:
             user_data = json.load(f) or {}
-        saved = (user_data.get("name") or "").strip().lower()
-        if saved in INVALID_NAMES:
-            user_data = {}
     except Exception:
         user_data = {}
 
@@ -60,12 +56,6 @@ def set_user_name(name: str):
     return True
 
 def get_user_name():
-    if os.path.exists(USER_FILE):
-        try:
-            d = json.load(open(USER_FILE, "r", encoding="utf-8")) or {}
-            return d.get("name")
-        except Exception:
-            pass
     return user_data.get("name")
 
 def set_user_greeted():
@@ -78,12 +68,6 @@ def set_user_greeted():
         pass
 
 def user_was_greeted():
-    if os.path.exists(USER_FILE):
-        try:
-            d = json.load(open(USER_FILE, "r", encoding="utf-8")) or {}
-            return bool(d.get("greeted"))
-        except Exception:
-            pass
     return bool(user_data.get("greeted"))
 
 def store_name(user_input: str):
@@ -104,8 +88,7 @@ def store_name(user_input: str):
     if len(tokens) == 1:
         token = re.sub(r"[^A-Za-z'\-]", "", tokens[0]).strip()
         if token and token.isalpha() and 2 <= len(token) <= 30 and token.lower() not in INVALID_NAMES:
-            if re.search(r"[aeiou]", token, flags=re.I) or len(token) <= 3:
-                return token.capitalize()
+            return token.capitalize()
     return None
 
 def choose_followup(user_input: str):
@@ -153,8 +136,8 @@ def ask_perplexity(user_input):
         return "(Offline Mode) Could not connect to API."
 
 def format_reply(ai_text, max_sentences: int = 7, followup: str = None, end_conversation: bool = False):
-    if not ai_text: return "<p>Sorry, I couldn't generate a reply right now.</p>"
     import re
+    if not ai_text: return "<p>Sorry, I couldn't generate a reply right now.</p>"
     text = re.sub(r'(?:\s*\[\d+\])+','', ai_text)
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text)
     text = text.replace('*','')
@@ -182,8 +165,6 @@ def chatbot_response(user_input):
     instruction = "You are Dilse, a friendly, caring, empathetic mental health chatbot. Answer supportively and concisely (limit to 7 sentences). End with a short follow-up question."
     if user_was_greeted():
         instruction += " Do NOT address the user by name in your reply."
-    else:
-        instruction += " You may use the user's name once to greet them."
     final_prompt = f"{system_prompt}\n{instruction}\nUser: {user_input}"
     ai_text = ask_perplexity(final_prompt)
     followup = choose_followup(user_input)
@@ -199,7 +180,7 @@ def chatbot_response(user_input):
         set_user_greeted()
     return html
 
-# --- Flask routes ---
+# --- Routes ---
 @app.route("/")
 def home():
     return render_template("index.html")
@@ -215,7 +196,6 @@ def chat():
 
 # --- Journal functionality ---
 JOURNAL_FILE = 'journal_entries.json'
-
 def get_user_id():
     if 'user_id' not in session:
         session['user_id'] = str(uuid.uuid4())
@@ -301,6 +281,11 @@ def download_journal():
         mimetype='text/plain',
         headers={'Content-Disposition':'attachment; filename="my_journal.txt"'}
     )
+
+# --- Goals page ---
+@app.route('/goals')
+def goals_page_route():
+    return render_template('goals.html')
 
 # --- Run Flask ---
 if __name__ == "__main__":

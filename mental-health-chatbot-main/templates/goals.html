@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dilse – Goals</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/616/616494.png">
+    <style>
+        .goals-container {
+            max-width: 600px;
+            margin: 40px auto;
+            background: #f8fafc;
+            border-radius: 18px;
+            box-shadow: 0 4px 18px rgba(37,99,235,0.08);
+            padding: 32px 28px;
+        }
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 18px;
+            background: #2563eb;
+            color: #fff;
+            padding: 6px 14px;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .goals-title {
+            font-size: 2rem;
+            color: #2563eb;
+            margin-bottom: 18px;
+            text-align: center;
+        }
+        .goals-form textarea {
+            width: 100%;
+            min-height: 60px;
+            font-size: 1.1rem;
+            border-radius: 12px;
+            border: 1px solid #bcd;
+            padding: 12px;
+            margin-bottom: 18px;
+            resize: vertical;
+        }
+        .goals-form button {
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 10px 24px;
+            font-size: 1.08rem;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .goals-form button:hover {
+            background: #1e40af;
+        }
+        .goals-list {
+            margin-top: 32px;
+        }
+        .goal-entry {
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 1px 6px rgba(37,99,235,0.07);
+            padding: 18px;
+            margin-bottom: 18px;
+            position: relative;
+        }
+        .goal-type {
+            font-weight: bold;
+            color: #2563eb;
+            margin-bottom: 6px;
+        }
+        .goal-date {
+            color: #888;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }
+        .goal-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+        }
+        .goal-buttons button {
+            border: none;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .edit-btn { background: #facc15; color: #000; }
+        .delete-btn { background: #ef4444; color: #fff; }
+        .complete-btn { background: #22c55e; color: #fff; }
+        .completed {
+            text-decoration: line-through;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="goals-container">
+        <a href="/" class="back-btn">&larr; Back</a>
+        <div class="goals-title">My Goals</div>
+        <form class="goals-form" id="goals-form">
+            <label for="short-term">Short Term Goal</label>
+            <textarea id="short-term" placeholder="Write your short term goal..."></textarea>
+            <label for="long-term">Long Term Aspiration</label>
+            <textarea id="long-term" placeholder="Write your long term aspiration..."></textarea>
+            <button type="submit">Save Goals</button>
+        </form>
+        <div class="goals-list" id="goals-list"></div>
+    </div>
+
+    <script>
+    function getGoals() {
+        return JSON.parse(localStorage.getItem('goalsEntries') || '[]');
+    }
+
+    function saveGoals(short, long) {
+        const entries = getGoals();
+        entries.unshift({ short, long, date: new Date().toLocaleString(), completed: false });
+        localStorage.setItem('goalsEntries', JSON.stringify(entries));
+    }
+
+    function renderGoals() {
+        const entries = getGoals();
+        const listDiv = document.getElementById('goals-list');
+        listDiv.innerHTML = entries.length ? '' : '<p style="color:#888;text-align:center;">No goals yet. Start writing!</p>';
+
+        entries.forEach((entry, i) => {
+            const div = document.createElement('div');
+            div.className = 'goal-entry' + (entry.completed ? ' completed' : '');
+            div.innerHTML = `
+                <div class="goal-date">${entry.date}</div>
+                <div class="goal-type">Short Term:</div><div>${escapeHtml(entry.short)}</div>
+                <div class="goal-type" style="margin-top:10px;">Long Term:</div><div>${escapeHtml(entry.long)}</div>
+                <div class="goal-buttons">
+                    <button class="edit-btn">Edit</button>
+                    <button class="delete-btn">Delete</button>
+                    <button class="complete-btn">${entry.completed ? 'Undo' : 'Completed'}</button>
+                </div>
+            `;
+            // Button events
+            div.querySelector('.edit-btn').addEventListener('click', () => editGoal(i));
+            div.querySelector('.delete-btn').addEventListener('click', () => deleteGoal(i));
+            div.querySelector('.complete-btn').addEventListener('click', () => toggleComplete(i));
+            listDiv.appendChild(div);
+        });
+    }
+
+    function escapeHtml(s){
+        if(!s)return"";
+        return s.replace(/[&<>"]+/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]});
+    }
+
+    function editGoal(index) {
+        const entries = getGoals();
+        const entry = entries[index];
+        const newShort = prompt("Edit Short Term Goal:", entry.short);
+        const newLong = prompt("Edit Long Term Aspiration:", entry.long);
+        if (newShort !== null && newLong !== null) {
+            entry.short = newShort;
+            entry.long = newLong;
+            entries[index] = entry;
+            localStorage.setItem('goalsEntries', JSON.stringify(entries));
+            renderGoals();
+        }
+    }
+
+    function deleteGoal(index) {
+        const entries = getGoals();
+        if (confirm("Are you sure you want to delete this goal?")) {
+            entries.splice(index, 1);
+            localStorage.setItem('goalsEntries', JSON.stringify(entries));
+            renderGoals();
+        }
+    }
+
+    function toggleComplete(index) {
+        const entries = getGoals();
+        entries[index].completed = !entries[index].completed;
+        localStorage.setItem('goalsEntries', JSON.stringify(entries));
+        renderGoals();
+    }
+
+    document.getElementById('goals-form').addEventListener('submit', function(e){
+        e.preventDefault();
+        const short = document.getElementById('short-term').value.trim();
+        const long = document.getElementById('long-term').value.trim();
+        if(short || long){
+            saveGoals(short, long);
+            document.getElementById('short-term').value = '';
+            document.getElementById('long-term').value = '';
+            renderGoals();
+        }
+    });
+
+    renderGoals();
+    </script>
+</body>
+</html>

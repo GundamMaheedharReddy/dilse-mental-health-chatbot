@@ -110,5 +110,21 @@
   {
     "role": "assistant",
     "content": "I'm glad you're feeling happy. Recognizing and enjoying positive emotions is important for your mental well-being[3][4][6]. Happiness can help you feel more motivated and connected, and it’s great to take a moment to appreciate it[4][6]. If you’d like, you can share what’s made you happy or keep a little gratitude journal to remember these moments[3][4]. Small celebrations, like doing something you enjoy, can make happiness last longer[3]. Remember, it's normal for feelings to change, and you can talk about anything here, whether it's good or challenging[4][6]. \n\nIs there something specific that made you feel happy today?"
+  },
+  {
+    "role": "user",
+    "content": "I feel anxious"
+  },
+  {
+    "role": "assistant",
+    "content": "Feeling anxious is something many students go through, and it’s okay to talk about it[1][2]. Simple techniques like deep breathing or grounding exercises can help calm your mind and body[1][8]. Taking a break, listening to music, or doing gentle stretches can also make a big difference[2][3]. Try to focus on what you can control and be kind to yourself, even when things feel tough[3][6]. Journaling about your feelings or using positive self-talk can help you process anxiety[1][7]. If your anxiety feels overwhelming, reaching out to a counselor or a trusted adult is a good step[2][4]. Remember, you’re not alone and support is always available[4][5].\n\nWould you like to try a breathing exercise or talk about what’s been making you feel anxious?"
+  },
+  {
+    "role": "user",
+    "content": "I am happy"
+  },
+  {
+    "role": "assistant",
+    "content": "That's fantastic to hear Feeling happy is something to truly appreciate, and it can make a big difference in your day. If you're comfortable, sharing what made you happy can help you hold onto that feeling longer. Sometimes, writing down things you're grateful for can also boost your mood. Remember, it's okay to feel different emotions, and it's great that you're acknowledging this positive one. If you want, you can share more about what's making you happy today. What's been the highlight of your day so far?"
   }
 ]
