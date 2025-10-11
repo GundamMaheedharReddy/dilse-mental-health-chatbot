@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Saathi — Planner</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+/* --- Smooth fade animation for Edit/Delete buttons --- */
+.edit-delete-container {
+  transition: opacity 0.4s ease;
+}
+
+/* --- Subtle fade for completed tasks --- */
+.planner-item.completed {
+  opacity: 0.75;
+  background-color: #f3f4f6;
+  transition: all 0.5s ease;
+  transform: translateX(0);
+}
+
+/* --- Slide + checkmark animation when marking complete --- */
+.planner-item.completed.animate-done {
+  transform: translateX(8px);
+  border-left: 4px solid #22c55e;
+  position: relative;
+}
+
+.planner-item.completed.animate-done::after {
+  content: "✅";
+  position: absolute;
+  left: -28px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.8);
+  opacity: 0;
+  animation: fadeInCheck 0.5s forwards;
+}
+
+@keyframes fadeInCheck {
+  0% { opacity: 0; transform: translateY(-50%) scale(0.6); }
+  100% { opacity: 1; transform: translateY(-50%) scale(1); }
+}
+</style>
+</head>
+<body>
+    <div class="container planner-container">
+        <header class="planner-header">
+            <h2>Planner</h2>
+            <div class="planner-actions">
+                <button id="back-to-chat-btn" class="btn" aria-label="Back to chat">◀ Back to Chat</button>
+                <button id="download-planner-btn" class="btn primary" aria-label="Download planner">📥 Download</button>
+                <button id="toggle-calendar-btn" class="btn" aria-label="Toggle calendar">📅 Calendar</button>
+                <button id="close-planner-btn" class="btn negative" aria-label="Close planner">Close</button>
+            </div>
+        </header>
+
+        <!-- Filters -->
+        <div class="planner-filters" style="display:flex;gap:8px;align-items:center;margin-bottom:12px;">
+            <div style="display:flex;gap:6px;">
+                <button class="btn filter-btn active" data-filter="all">All</button>
+                <button class="btn filter-btn" data-filter="today">Today</button>
+                <button class="btn filter-btn" data-filter="upcoming">Upcoming (7d)</button>
+                <button class="btn filter-btn" data-filter="completed">Completed</button>
+            </div>
+            <div style="margin-left:auto;color:#6b7280;font-size:0.95rem;">Tip: click a task to edit inline</div>
+        </div>
+
+        <form id="planner-form" class="planner-form" aria-label="Planner form">
+            <label class="col">
+                <span style="font-weight:600;">Title <span style="color:#ef4444;">*</span></span>
+                <input id="plan-title" placeholder="Task title" required aria-required="true">
+            </label>
+
+            <div class="row grid-2" role="group" aria-label="Date and time">
+                <label class="col">
+                    <span style="font-weight:600;">Date</span>
+                    <input id="plan-date" type="date" aria-label="Date">
+                    <small style="color:#6b7280;">dd-mm-yyyy</small>
+                </label>
+                <label class="col">
+                    <span style="font-weight:600;">Time</span>
+                    <input id="plan-time" type="time" aria-label="Time">
+                    <small style="color:#6b7280;">--:--</small>
+                </label>
+            </div>
+
+            <label class="col">
+                <span style="font-weight:600;">Notes (optional)</span>
+                <textarea id="plan-notes" rows="3" aria-label="Notes (optional)"></textarea>
+            </label>
+
+            <div>
+                <button type="submit" class="btn positive">➕ Add Task</button>
+            </div>
+        </form>
+
+        <!-- Calendar (hidden by default) -->
+        <div id="planner-calendar" class="planner-calendar" style="display:none;margin-bottom:12px;"></div>
+
+        <div id="planner-list" class="planner-list">
+            <div class="planner-empty">No tasks yet. Add your first task above!</div>
+        </div>
+    </div>
+
+<script>
+let allItems = [];
+let currentFilter = 'all';
+const listEl = document.getElementById("planner-list");
+const calendarEl = document.getElementById("planner-calendar");
+
+async function loadPlanner(){
+    listEl.innerHTML = "<p>Loading…</p>";
+    try {
+        const res = await fetch("/planner_items");
+        allItems = await res.json();
+        renderPlanner(allItems || []);
+        renderCalendar(allItems || []);
+    } catch (e) {
+        listEl.innerHTML = "<p>Error loading planner.</p>";
+    }
+}
+
+function applyFilter(items){
+    const now = new Date();
+    if(currentFilter === 'today'){
+        return items.filter(it => it.date && (new Date(it.date).toDateString() === now.toDateString()));
+    }
+    if(currentFilter === 'upcoming'){
+        const in7 = new Date();
+        in7.setDate(in7.getDate() + 7);
+        return items.filter(it => it.date && new Date(it.date) >= now && new Date(it.date) <= in7);
+    }
+    if(currentFilter === 'completed'){
+        return items.filter(it => it.completed);
+    }
+    return items;
+}
+
+function escapeHtml(s){
+    if(!s) return "";
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderPlanner(items){
+    const itemsToShow = applyFilter(items);
+    if(!itemsToShow || !itemsToShow.length){
+        listEl.innerHTML = "<p style='color:#6b7280;'>No tasks match this filter.</p>";
+        return;
+    }
+    listEl.innerHTML = "";
+    itemsToShow.sort((a,b) => (a.date || "") > (b.date || "") ? 1 : -1);
+    itemsToShow.forEach(it => {
+        const div = document.createElement("div");
+        div.className = "planner-item " + (it.completed ? "completed" : "pending");
+        div.dataset.id = it.id;
+
+        div.innerHTML = `
+            <div class="meta" style="display:flex;align-items:center;gap:8px;">
+                <input type="checkbox" ${it.completed ? "checked" : ""} data-id="${it.id}" class="planner-complete">
+                <div class="title-area" style="flex:1;min-width:0;">
+                    <strong class="title-text" style="${it.completed ? 'text-decoration:line-through;color:#6b7280' : ''}">
+                        ${escapeHtml(it.title)}
+                    </strong>
+                    <div class="meta-small" style="color:#374151;font-size:0.9rem;">${it.date || ""} ${it.time || ""}</div>
+                </div>
+                <div class="edit-delete-container" 
+                     style="display:flex;gap:8px;align-items:center;
+                            opacity:${it.completed ? 0 : 1};
+                            pointer-events:${it.completed ? 'none' : 'auto'};">
+                    <button data-id="${it.id}" class="btn edit-btn">Edit</button>
+                    <button data-id="${it.id}" class="btn delete-btn negative">Delete</button>
+                </div>
+            </div>
+            <div class="notes" style="color:#374151;margin-top:6px;">${escapeHtml(it.notes || "")}</div>
+        `;
+
+        div.querySelector(".edit-btn").addEventListener("click", () => startInlineEdit(div, it));
+        div.querySelector(".delete-btn").addEventListener("click", async (e) => {
+            const id = e.currentTarget.dataset.id;
+            await fetch(`/planner_items/${id}`, {method:"DELETE"});
+            loadPlanner();
+        });
+
+        // ✅ When ticked, animate + hide edit/delete
+        div.querySelector(".planner-complete").addEventListener("change", async (e) => {
+            const id = e.currentTarget.dataset.id;
+            const completed = e.currentTarget.checked;
+
+            if (completed) {
+                div.classList.add("animate-done");
+                setTimeout(() => div.classList.remove("animate-done"), 1000);
+            }
+
+            await fetch(`/planner_items/${id}`, {
+                method: "PATCH",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({completed})
+            });
+            loadPlanner();
+        });
+
+        listEl.appendChild(div);
+    });
+}
+
+function startInlineEdit(container, item){
+    const originalHTML = container.innerHTML;
+    container.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            <input class="edit-title" value="${escapeHtml(item.title)}" style="padding:8px;border-radius:6px;border:1px solid #ccc;font-size:1rem;">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="date" class="edit-date" value="${item.date || ''}" style="padding:8px;border-radius:6px;border:1px solid #ccc;">
+                <input type="time" class="edit-time" value="${item.time || ''}" style="padding:8px;border-radius:6px;border:1px solid #ccc;">
+                <label style="display:flex;align-items:center;gap:6px;margin-left:auto;">
+                    <input type="checkbox" class="edit-completed" ${item.completed ? "checked" : ""}> Completed
+                </label>
+            </div>
+            <textarea class="edit-notes" rows="2" style="padding:8px;border-radius:6px;border:1px solid #ccc;">${escapeHtml(item.notes || '')}</textarea>
+            <div style="display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn" id="cancel-edit">Cancel</button>
+                <button class="btn positive" id="save-edit">Save</button>
+            </div>
+        </div>
+    `;
+    container.querySelector("#cancel-edit").addEventListener("click", () => {
+        container.innerHTML = originalHTML;
+        loadPlanner();
+    });
+    container.querySelector("#save-edit").addEventListener("click", async () => {
+        const payload = {
+            title: container.querySelector(".edit-title").value.trim(),
+            date: container.querySelector(".edit-date").value,
+            time: container.querySelector(".edit-time").value,
+            notes: container.querySelector(".edit-notes").value.trim(),
+            completed: container.querySelector(".edit-completed").checked
+        };
+        await fetch(`/planner_items/${item.id}`, {
+            method: "PATCH",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+        loadPlanner();
+    });
+}
+
+function renderCalendar(items){
+    calendarEl.innerHTML = "";
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+    const first = new Date(year, month, 1);
+    const startDay = first.getDay();
+    const daysInMonth = new Date(year, month+1, 0).getDate();
+
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+    header.style.marginBottom = "8px";
+    header.innerHTML = `<strong>${first.toLocaleString(undefined,{month:'long', year:'numeric'})}</strong>`;
+    calendarEl.appendChild(header);
+
+    const grid = document.createElement("div");
+    grid.className = "calendar-grid";
+
+    ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].forEach(d => {
+        const hd = document.createElement("div");
+        hd.className = "calendar-cell header";
+        hd.textContent = d;
+        grid.appendChild(hd);
+    });
+
+    for(let i=0;i<startDay;i++){
+        const empty = document.createElement("div");
+        empty.className = "calendar-cell empty";
+        grid.appendChild(empty);
+    }
+
+    for(let d=1; d<=daysInMonth; d++){
+        const cell = document.createElement("div");
+        cell.className = "calendar-cell day";
+        const dateStr = new Date(year, month, d).toISOString().slice(0,10);
+        const dayTasks = items.filter(it => it.date === dateStr);
+        cell.innerHTML = `<div class="day-num">${d}</div>`;
+        if(dayTasks.length){
+            const list = document.createElement("div");
+            list.className = "day-tasks";
+            dayTasks.slice(0,3).forEach(t => {
+                const tEl = document.createElement("div");
+                tEl.className = "day-task";
+                tEl.textContent = t.title;
+                list.appendChild(tEl);
+            });
+            if(dayTasks.length>3){
+                const more = document.createElement("div");
+                more.className = "day-more";
+                more.textContent = `+${dayTasks.length-3} more`;
+                list.appendChild(more);
+            }
+            cell.appendChild(list);
+        }
+        cell.addEventListener("click", () => {
+            currentFilter = 'all';
+            document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+            document.querySelector('.filter-btn[data-filter="all"]').classList.add('active');
+            renderPlanner(items.filter(it=>it.date===dateStr));
+            window.scrollTo({top: document.getElementById('planner-list').offsetTop - 20, behavior:'smooth'});
+        });
+        grid.appendChild(cell);
+    }
+    calendarEl.appendChild(grid);
+}
+
+document.getElementById("planner-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = document.getElementById("plan-title").value.trim();
+    const date = document.getElementById("plan-date").value;
+    const time = document.getElementById("plan-time").value;
+    const notes = document.getElementById("plan-notes").value.trim();
+    if(!title) return;
+    try {
+        await fetch("/planner_items", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({title, date, time, notes})
+        });
+        document.getElementById("planner-form").reset();
+        loadPlanner();
+    } catch (err) {
+        console.error(err);
+    }
+});
+
+document.getElementById("download-planner-btn").addEventListener("click", () => {
+    window.location = "/download_planner_text";
+});
+document.getElementById("back-to-chat-btn").addEventListener("click", () => {
+    window.location.href = "/";
+});
+document.getElementById("toggle-calendar-btn").addEventListener("click", () => {
+    calendarEl.style.display = calendarEl.style.display === 'none' ? 'block' : 'none';
+    if(calendarEl.style.display === 'block') renderCalendar(allItems || []);
+});
+
+document.querySelectorAll('.filter-btn').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+        document.querySelectorAll('.filter-btn').forEach(x=>x.classList.remove('active'));
+        e.currentTarget.classList.add('active');
+        currentFilter = e.currentTarget.dataset.filter;
+        renderPlanner(allItems || []);
+    });
+});
+
+loadPlanner();
+</script>
+</body>
+</html>
