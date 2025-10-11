@@ -1,104 +1,58 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>
-// Show loading animation when waiting for chatbot response
-function showLoading() {
-    document.getElementById('loading-animation').style.display = 'block';
-    document.getElementById('main-app').style.opacity = '0.4';
-}
-function hideLoading() {
-    document.getElementById('loading-animation').style.display = 'none';
-    document.getElementById('main-app').style.opacity = '1';
-}
-
-// Patch sendMessage to show/hide loading animation
-window.addEventListener('DOMContentLoaded', function() {
-    if (typeof sendMessage === 'function') {
-        const origSendMessage = sendMessage;
-        window.sendMessage = function() {
-            showLoading();
-            origSendMessage.apply(this, arguments);
-        };
-    }
-});
-</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dilse – Mental Health Companion</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<style>
+/* Typing indicator (dot animation) */
+.thinking-container { 
+    display:flex; 
+    align-items:center; 
+    gap:10px;
+    background: #d0e7ff;
+    color:#333;
+    padding:10px 14px;
+    border-radius:18px;
+    max-width:70%;
+}
+.thinking-inner { display:flex; align-items:center; gap:12px; }
+.typing { display:flex; gap:5px; }
+.dot { width:10px; height:10px; background:#2563eb; border-radius:50%; animation:bounce 1s infinite; }
+.dot:nth-child(2){ animation-delay:0.2s; }
+.dot:nth-child(3){ animation-delay:0.4s; }
+@keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+</style>
 </head>
 <body>
 
-<!-- Loading Animation: Growing Plant -->
-<div id="loading-animation" style="display:none;">
-    <div class="plant-loader">
-        <svg width="120" height="120" viewBox="0 0 120 120">
-            <g>
-                <rect x="55" y="90" width="10" height="20" rx="5" fill="#8D6748" />
-                <rect x="58" y="60" width="4" height="30" rx="2" fill="#4CAF50">
-                    <animate attributeName="height" from="4" to="30" dur="2s" repeatCount="indefinite" />
-                    <animate attributeName="y" from="86" to="60" dur="2s" repeatCount="indefinite" />
-                </rect>
-                <ellipse cx="60" cy="60" rx="12" ry="6" fill="#81C784">
-                    <animate attributeName="ry" from="2" to="6" dur="2s" repeatCount="indefinite" />
-                </ellipse>
-                <ellipse cx="60" cy="50" rx="7" ry="3" fill="#AED581">
-                    <animate attributeName="ry" from="1" to="3" dur="2s" repeatCount="indefinite" />
-                </ellipse>
-                <ellipse cx="60" cy="42" rx="4" ry="2" fill="#C5E1A5">
-                    <animate attributeName="ry" from="0.5" to="2" dur="2s" repeatCount="indefinite" />
-                </ellipse>
-            </g>
-        </svg>
-        <div class="loader-text">Growing...<br><span style="font-size:0.95em;color:#388e3c;">Growth, hope, and mental well-being</span></div>
+<!-- Landing Page -->
+<div id="landing">
+    <div class="landing-overlay">
+        <div class="landing-content">
+            <div class="avatar">🤖</div>
+            <h1>Dilse</h1>
+            <p>“A mirror for your mind — reflecting your thoughts, reframing your worries, and reminding you you’re never alone.”</p>
+            <button class="start-btn" id="start-btn">Start Chatting Now</button>
+        </div>
     </div>
 </div>
-<style>
-.plant-loader {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 220px;
-    background: #fff;
-    border-radius: 18px;
-    box-shadow: 0 2px 12px rgba(76,175,80,0.08);
-    margin: 32px auto;
-    width: 180px;
-}
-.plant-loader svg {
-    margin-bottom: 8px;
-}
-.loader-text {
-    text-align: center;
-    color: #388e3c;
-    font-weight: 500;
-}
-</style>
 
 <!-- Chat Interface -->
 <div id="main-app" style="display:none;">
     <div class="chat-wrapper">
         <header>
             <div class="header-content">
-                <h1></h1>
+                <h1>Dilse</h1>
                 <p>Be kind to your mind</p>
-                <!-- open planner in a new tab -->
-                <button id="open-planner-btn" onclick="window.open('/planner','_blank')" title="Open Planner" style="margin-left:auto;padding:8px 12px;border-radius:8px;border:none;background:#10b981;color:#fff;cursor:pointer;">
-                    Planner
+                <button id="open-journal-btn" onclick="window.location.href='/journal'" title="Open Journal" style="margin-left:auto;padding:8px 12px;border-radius:8px;border:none;background:#2563eb;color:#fff;cursor:pointer;">
+                    Journal
                 </button>
             </div>
         </header>
 
         <div id="chat-box" class="chat-box"></div>
-<script>
-// Hide loading animation when chatbot reply is received
-function onChatbotReply() {
-    hideLoading();
-}
-// Example: If you use AJAX, call onChatbotReply() after response
-</script>
 
         <!-- Quick replies hidden until name is entered -->
         <div class="quick-replies" id="quick-replies" style="display:none;">
@@ -131,7 +85,7 @@ function onChatbotReply() {
 document.getElementById("start-btn").addEventListener("click", () => {
     document.getElementById("landing").style.display = "none";
     document.getElementById("main-app").style.display = "block";
-    addMessage("Dilse", "Hello! I’m Dilse, your mental health companion. May I know your name?");
+    addMessage("dilse", "Hello! I’m Dilse, your mental health companion. May I know your name?");
 });
 
 let chatHistory = [];
@@ -143,7 +97,7 @@ const userInput = document.getElementById("user-input");
 const quickReplies = document.getElementById("quick-replies");
 const downloadBtn = document.getElementById("download-btn");
 
-let thinkingElem = null; // reference to current thinking indicator
+let thinkingElem = null;
 
 function addMessage(sender, message) {
     const msgDiv = document.createElement("div");
@@ -158,15 +112,16 @@ function addMessage(sender, message) {
     chatHistory.push({sender, message});
 }
 
-function showThinking(text = "Your Dilse is thinking…") {
-    // avoid duplicate
+function showThinking(text = "Dilse is thinking…") {
     if (thinkingElem) return;
     thinkingElem = document.createElement("div");
     thinkingElem.className = "message dilse thinking-container";
     thinkingElem.innerHTML = `
-        <div class="thinking-inner">
-            <div class="breathing-circle" aria-hidden="true"></div>
-            <div class="thinking-text">${text}</div>
+        <span class="avatar">🤖</span>
+        <div class="typing">
+            <div class="dot"></div>
+            <div class="dot"></div>
+            <div class="dot"></div>
         </div>
     `;
     chatBox.appendChild(thinkingElem);
@@ -197,15 +152,14 @@ async function sendMessage(msg){
     addMessage("user", msg);
 
     if(!userName){
-        const EMOTIONS = ["happy","sad","angry","anxious","excited","stressed","calm","lonely","relaxed","tired","bored","scared","afraid","depressed","upset","ok","okay"];
-
-        const nameRegex = /\b(?:my name is|call me|i am|i'm|im)\s+([A-Za-z][A-ZaZ'\-\s]*)/i;
+        const EMOTIONS = ["happy","sad","angry","anxious","excited","stressed","calm","lonely","relaxed","tired","bored","scared","afraid","depressed","upset","ok","okay","yes","yeah","no","not"];
+        const nameRegex = /\b(?:my name is|call me|i am|i'm|im)\s+([A-Za-z][A-Za-z'\-\s]*)/i;
         const match = msg.match(nameRegex);
         if(match){
             let nameCaptured = match[1].trim().split(/[,\.\!\?]/)[0].split(/\s+/)[0];
             if(nameCaptured.length >= 2 && !EMOTIONS.includes(nameCaptured.toLowerCase())){
                 userName = nameCaptured.charAt(0).toUpperCase() + nameCaptured.slice(1).toLowerCase();
-                addMessage("Dilse", `Nice to meet you, ${userName}! How are you feeling today?`);
+                addMessage("dilse", `Nice to meet you, ${userName}! How are you feeling today?`);
                 userInput.placeholder = "How are you feeling today? 💛";
                 quickReplies.style.display = "flex";
                 return;
@@ -216,19 +170,18 @@ async function sendMessage(msg){
             const token = msg.replace(/[^A-Za-z'\-]/g, "");
             if(token.length >= 2 && !EMOTIONS.includes(token.toLowerCase())){
                 userName = token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
-                addMessage("Dilse", `Nice to meet you, ${userName}! How are you feeling today?`);
+                addMessage("dilse", `Nice to meet you, ${userName}! How are you feeling today?`);
                 userInput.placeholder = "How are you feeling today? 💛";
                 quickReplies.style.display = "flex";
                 return;
             }
         }
 
-        addMessage("Dilse", "Hello! I’m Dilse, your mental health companion. May I know your name?");
+        addMessage("dilse", "Hello! I’m Dilse, your mental health companion. May I know your name?");
         return;
     }
 
     try{
-        // show breathing / thinking indicator while waiting
         showThinking();
 
         const res = await fetch("/chat", {
@@ -237,14 +190,12 @@ async function sendMessage(msg){
             body: JSON.stringify({message: msg})
         });
 
-        // hide indicator as soon as we have a response (prevents cutting)
         hideThinking();
-
         const data = await res.json();
-        addMessage("Dilse", data.reply);
+        addMessage("dilse", data.reply);
     } catch(err){
         hideThinking();
-        addMessage("Dilse", "⚠️ Error: Cannot reach server.");
+        addMessage("dilse", "⚠️ Error: Cannot reach server.");
     }
 }
 
@@ -254,16 +205,10 @@ downloadBtn.addEventListener("click", () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "Dilse_chat.txt";
+    a.download = "dilse_chat.txt";
     a.click();
     URL.revokeObjectURL(url);
 });
-
-// simple helper to avoid XSS in small app
-function escapeHtml(s){
-    if(!s) return "";
-    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
 </script>
 </body>
 </html>
